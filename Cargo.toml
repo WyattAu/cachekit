@@ -1,0 +1,39 @@
+[package]
+name = "cachekit"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Unified caching for Rust — in-memory (moka) and Redis backends with TTL, stale-while-revalidate, and eviction listeners"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/WyattAu/cachekit"
+keywords = ["cache", "moka", "redis", "ttl", "in-memory"]
+categories = ["caching"]
+
+[dependencies]
+thiserror = "2"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["rt", "macros", "sync"] }
+async-trait = "0.1"
+
+[dependencies.moka]
+version = "0.12"
+optional = true
+features = ["future"]
+
+[dependencies.redis]
+version = "0.25"
+optional = true
+features = ["tokio-comp", "connection-manager"]
+
+[dependencies.dashmap]
+version = "6"
+optional = true
+
+[dev-dependencies]
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+
+[features]
+default = ["in-memory"]
+in-memory = ["dep:moka"]
+redis = ["dep:redis"]
+dashmap = ["dep:dashmap"]
