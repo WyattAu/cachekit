@@ -47,6 +47,161 @@ pub use stats::CacheStats;
 #[cfg(feature = "in-memory")]
 pub use in_memory::InMemoryBackend;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[test]
+    fn cache_stats_default() {
+        let stats = CacheStats::default();
+        assert_eq!(stats.hits, 0);
+        assert_eq!(stats.misses, 0);
+        assert_eq!(stats.hit_rate, 0.0);
+        assert_eq!(stats.size, 0);
+        assert!(stats.is_empty());
+        assert_eq!(stats.total_lookups(), 0);
+    }
+
+    #[test]
+    fn cache_stats_hit_rate_calculation() {
+        let stats = CacheStats {
+            hits: 75,
+            misses: 25,
+            hit_rate: 0.75,
+            size: 100,
+        };
+        assert!((stats.hit_rate - 0.75).abs() < f64::EPSILON);
+        assert_eq!(stats.total_lookups(), 100);
+        assert!(!stats.is_empty());
+    }
+
+    #[test]
+    fn cache_stats_display() {
+        let stats = CacheStats {
+            hits: 10,
+            misses: 5,
+            hit_rate: 0.6667,
+            size: 15,
+        };
+        let display = stats.to_string();
+        assert!(display.contains("hits: 10"));
+        assert!(display.contains("misses: 5"));
+        assert!(display.contains("66.7%"));
+        assert!(display.contains("size: 15"));
+    }
+
+    #[test]
+    fn cache_entry_creation_and_age() {
+        let entry = CacheEntry {
+            value: "hello".to_string(),
+            created_at: std::time::Instant::now(),
+            expires_at: None,
+        };
+        assert!(!entry.is_expired());
+        assert!(entry.age() < Duration::from_millis(100));
+        assert!(entry.remaining_ttl().is_none());
+    }
+
+    #[test]
+    fn cache_entry_with_expiry() {
+        let entry = CacheEntry {
+            value: 42,
+            created_at: std::time::Instant::now(),
+            expires_at: Some(std::time::Instant::now() + Duration::from_secs(10)),
+        };
+        assert!(!entry.is_expired());
+        assert!(entry.remaining_ttl().is_some());
+        let ttl = entry.remaining_ttl().unwrap();
+        assert!(ttl > Duration::from_secs(9) && ttl <= Duration::from_secs(10));
+    }
+
+    #[test]
+    fn cache_entry_expired() {
+        let entry = CacheEntry {
+            value: "old",
+            created_at: std::time::Instant::now() - Duration::from_secs(100),
+            expires_at: Some(std::time::Instant::now() - Duration::from_secs(1)),
+        };
+        assert!(entry.is_expired());
+        assert_eq!(entry.remaining_ttl(), Some(Duration::ZERO));
+    }
+
+    #[test]
+    fn cache_error_display() {
+        let err = CacheError::Serialization("bad json".to_string());
+        assert_eq!(err.to_string(), "serialization error: bad json");
+
+        let err = CacheError::Backend("redis down".to_string());
+        assert_eq!(err.to_string(), "backend error: redis down");
+
+        let err = CacheError::Expired;
+        assert_eq!(err.to_string(), "cache entry expired");
+
+        let err = CacheError::Full;
+        assert_eq!(err.to_string(), "cache full");
+
+        let err = CacheError::Other("something".to_string());
+        assert_eq!(err.to_string(), "cache error: something");
+    }
+
+    #[tokio::test]
+    async fn in_memory_cache_insert_and_get() {
+        let backend = InMemoryBackend::new(100, Duration::from_secs(60));
+        let cache = Cache::new(backend);
+
+        cache.insert("key1", "value1".to_string()).await.unwrap();
+        let entry = cache.get(&"key1").await.unwrap();
+        assert!(entry.is_some());
+        assert_eq!(entry.unwrap().value, "value1");
+    }
+
+    #[tokio::test]
+    async fn in_memory_cache_miss() {
+        let backend: InMemoryBackend<&str, i32> = InMemoryBackend::new(100, Duration::from_secs(60));
+        let cache = Cache::new(backend);
+
+        let entry = cache.get(&"nonexistent").await.unwrap();
+        assert!(entry.is_none());
+    }
+
+    #[tokio::test]
+    async fn in_memory_cache_remove() {
+        let backend = InMemoryBackend::new(100, Duration::from_secs(60));
+        let cache = Cache::new(backend);
+
+        cache.insert("k", "v".to_string()).await.unwrap();
+        let removed = cache.remove(&"k").await.unwrap();
+        assert_eq!(removed, Some("v".to_string()));
+        assert!(cache.get(&"k").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn in_memory_cache_stats() {
+        let backend = InMemoryBackend::new(100, Duration::from_secs(60));
+        let cache = Cache::new(backend);
+
+        cache.insert("a", 1).await.unwrap();
+        let _ = cache.get(&"a").await.unwrap(); // hit
+        let _ = cache.get(&"b").await.unwrap(); // miss
+
+        let stats = cache.stats().await.unwrap();
+        assert_eq!(stats.hits, 1);
+        assert_eq!(stats.misses, 1);
+        assert!((stats.hit_rate - 0.5).abs() < f64::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn in_memory_cache_clear() {
+        let backend = InMemoryBackend::new(100, Duration::from_secs(60));
+        let cache = Cache::new(backend);
+
+        cache.insert("x", 10).await.unwrap();
+        cache.clear().await.unwrap();
+        assert!(cache.get(&"x").await.unwrap().is_none());
+    }
+}
+
 /// A unified cache interface.
 pub struct Cache<K, V> {
     backend: Box<dyn CacheBackend<K = K, V = V>>,
