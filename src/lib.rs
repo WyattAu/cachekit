@@ -33,6 +33,8 @@
 //! | `redis` | `redis` | Yes | Yes | No |
 //! | `dashmap` | `dashmap` | No | No | No |
 
+use std::time::Duration;
+
 mod backend;
 mod error;
 mod stats;
@@ -40,12 +42,19 @@ mod stats;
 #[cfg(feature = "in-memory")]
 pub mod in_memory;
 
+#[cfg(feature = "redis")]
+#[path = "redis.rs"]
+pub mod redis_backend;
+
 pub use backend::CacheBackend;
 pub use error::CacheError;
 pub use stats::CacheStats;
 
 #[cfg(feature = "in-memory")]
 pub use in_memory::InMemoryBackend;
+
+#[cfg(feature = "redis")]
+pub use redis_backend::RedisBackend;
 
 #[cfg(test)]
 mod tests {
@@ -97,6 +106,8 @@ mod tests {
             value: "hello".to_string(),
             created_at: std::time::Instant::now(),
             expires_at: None,
+            max_age_at: None,
+            stale_until: None,
         };
         assert!(!entry.is_expired());
         assert!(entry.age() < Duration::from_millis(100));
@@ -109,6 +120,8 @@ mod tests {
             value: 42,
             created_at: std::time::Instant::now(),
             expires_at: Some(std::time::Instant::now() + Duration::from_secs(10)),
+            max_age_at: None,
+            stale_until: None,
         };
         assert!(!entry.is_expired());
         assert!(entry.remaining_ttl().is_some());
@@ -122,6 +135,8 @@ mod tests {
             value: "old",
             created_at: std::time::Instant::now() - Duration::from_secs(100),
             expires_at: Some(std::time::Instant::now() - Duration::from_secs(1)),
+            max_age_at: None,
+            stale_until: None,
         };
         assert!(entry.is_expired());
         assert_eq!(entry.remaining_ttl(), Some(Duration::ZERO));
@@ -243,6 +258,23 @@ where
     pub async fn stats(&self) -> Result<CacheStats, CacheError> {
         self.backend.stats().await
     }
+
+    /// Insert a value with stale-while-revalidate semantics.
+    ///
+    /// - `max_age`: Duration after which the entry becomes stale.
+    /// - `stale_while_revalidate`: Duration after `max_age` during which the stale
+    ///   value is still returned while the caller refreshes in the background.
+    pub async fn insert_with_swr(
+        &self,
+        key: K,
+        value: V,
+        max_age: Duration,
+        stale_while_revalidate: Duration,
+    ) -> Result<(), CacheError> {
+        self.backend
+            .insert_with_swr(key, value, max_age, stale_while_revalidate)
+            .await
+    }
 }
 
 /// A cached entry with metadata.
@@ -251,6 +283,10 @@ pub struct CacheEntry<V> {
     pub value: V,
     pub created_at: std::time::Instant,
     pub expires_at: Option<std::time::Instant>,
+    /// When the entry becomes stale (after max_age has elapsed).
+    pub max_age_at: Option<std::time::Instant>,
+    /// When the stale entry should stop being served (end of stale_while_revalidate window).
+    pub stale_until: Option<std::time::Instant>,
 }
 
 impl<V> CacheEntry<V> {
@@ -259,6 +295,24 @@ impl<V> CacheEntry<V> {
         self.expires_at
             .map(|exp| std::time::Instant::now() >= exp)
             .unwrap_or(false)
+    }
+
+    /// Returns `true` if the entry is stale (past max_age but within stale_while_revalidate window).
+    pub fn is_stale(&self) -> bool {
+        let now = std::time::Instant::now();
+        match self.max_age_at {
+            Some(max_age) => {
+                if now < max_age {
+                    return false;
+                }
+                // Past max_age — check if within stale window
+                match self.stale_until {
+                    Some(until) => now < until,
+                    None => true, // No stale window limit, always stale after max_age
+                }
+            }
+            None => false, // No max_age set, never stale
+        }
     }
 
     /// Returns the age of the entry.

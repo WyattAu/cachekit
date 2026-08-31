@@ -73,6 +73,27 @@ where
             value,
             created_at: std::time::Instant::now(),
             expires_at: None,
+            max_age_at: None,
+            stale_until: None,
+        };
+        self.cache.insert(key, entry).await;
+        Ok(())
+    }
+
+    async fn insert_with_swr(
+        &self,
+        key: K,
+        value: V,
+        max_age: Duration,
+        stale_while_revalidate: Duration,
+    ) -> Result<(), crate::CacheError> {
+        let now = std::time::Instant::now();
+        let entry = CacheEntry {
+            value,
+            created_at: now,
+            expires_at: Some(now + max_age + stale_while_revalidate),
+            max_age_at: Some(now + max_age),
+            stale_until: Some(now + max_age + stale_while_revalidate),
         };
         self.cache.insert(key, entry).await;
         Ok(())
