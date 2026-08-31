@@ -32,9 +32,15 @@ optional = true
 
 [dev-dependencies]
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+criterion = { version = "0.5", features = ["html_reports"] }
+
 
 [features]
 default = ["in-memory"]
 in-memory = ["dep:moka"]
 redis = ["dep:redis"]
 dashmap = ["dep:dashmap"]
+
+[[bench]]
+name = "cache_bench"
+harness = false
