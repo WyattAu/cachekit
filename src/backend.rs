@@ -6,7 +6,9 @@ use crate::CacheStats;
 /// Trait for cache backends.
 #[async_trait::async_trait]
 pub trait CacheBackend: Send + Sync {
+    /// Cache key type.
     type K: Send + Sync;
+    /// Cache value type.
     type V: Clone + Send + Sync;
 
     /// Get a value from the cache.

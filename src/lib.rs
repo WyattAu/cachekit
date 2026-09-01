@@ -1,4 +1,5 @@
 #![forbid(unsafe_code)]
+#![deny(missing_docs)]
 
 //! # cachekit
 //!
@@ -39,6 +40,7 @@ mod backend;
 mod error;
 mod stats;
 
+/// In-memory cache backend using moka.
 #[cfg(feature = "in-memory")]
 pub mod in_memory;
 
@@ -280,8 +282,11 @@ where
 /// A cached entry with metadata.
 #[derive(Debug, Clone)]
 pub struct CacheEntry<V> {
+    /// The cached value.
     pub value: V,
+    /// When the entry was created.
     pub created_at: std::time::Instant,
+    /// When the entry expires.
     pub expires_at: Option<std::time::Instant>,
     /// When the entry becomes stale (after max_age has elapsed).
     pub max_age_at: Option<std::time::Instant>,
