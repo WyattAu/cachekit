@@ -49,6 +49,10 @@ pub mod in_memory;
 #[path = "redis.rs"]
 pub mod redis_backend;
 
+#[cfg(feature = "sqlite")]
+/// SQLite cache backend.
+pub mod sqlite;
+
 pub use backend::CacheBackend;
 pub use error::CacheError;
 pub use stats::CacheStats;
@@ -58,6 +62,9 @@ pub use in_memory::InMemoryBackend;
 
 #[cfg(feature = "redis")]
 pub use redis_backend::RedisBackend;
+
+#[cfg(feature = "sqlite")]
+pub use sqlite::SqliteBackend;
 
 #[cfg(test)]
 mod tests {
@@ -217,6 +224,134 @@ mod tests {
         cache.insert("x", 10).await.unwrap();
         cache.clear().await.unwrap();
         assert!(cache.get(&"x").await.unwrap().is_none());
+    }
+
+    #[cfg(feature = "sqlite")]
+    mod sqlite_tests {
+        use super::*;
+
+        #[tokio::test]
+        async fn sqlite_insert_and_get() {
+            let backend = crate::SqliteBackend::in_memory().unwrap();
+            let cache = Cache::new(backend);
+
+            cache.insert("key1".to_string(), b"value1".to_vec()).await.unwrap();
+            let entry = cache.get(&"key1".to_string()).await.unwrap();
+            assert!(entry.is_some());
+            assert_eq!(entry.unwrap().value, b"value1");
+        }
+
+        #[tokio::test]
+        async fn sqlite_miss() {
+            let backend = crate::SqliteBackend::in_memory().unwrap();
+            let cache = Cache::new(backend);
+
+            let entry = cache.get(&"nonexistent".to_string()).await.unwrap();
+            assert!(entry.is_none());
+        }
+
+        #[tokio::test]
+        async fn sqlite_remove() {
+            let backend = crate::SqliteBackend::in_memory().unwrap();
+            let cache = Cache::new(backend);
+
+            cache.insert("k".to_string(), b"v".to_vec()).await.unwrap();
+            let removed = cache.remove(&"k".to_string()).await.unwrap();
+            assert_eq!(removed, Some(b"v".to_vec()));
+            assert!(cache.get(&"k".to_string()).await.unwrap().is_none());
+        }
+
+        #[tokio::test]
+        async fn sqlite_remove_nonexistent() {
+            let backend = crate::SqliteBackend::in_memory().unwrap();
+            let cache = Cache::new(backend);
+
+            let removed = cache.remove(&"nope".to_string()).await.unwrap();
+            assert_eq!(removed, None);
+        }
+
+        #[tokio::test]
+        async fn sqlite_clear() {
+            let backend = crate::SqliteBackend::in_memory().unwrap();
+            let cache = Cache::new(backend);
+
+            cache.insert("a".to_string(), b"1".to_vec()).await.unwrap();
+            cache.insert("b".to_string(), b"2".to_vec()).await.unwrap();
+            cache.clear().await.unwrap();
+            assert!(cache.get(&"a".to_string()).await.unwrap().is_none());
+            assert!(cache.get(&"b".to_string()).await.unwrap().is_none());
+        }
+
+        #[tokio::test]
+        async fn sqlite_stats() {
+            let backend = crate::SqliteBackend::in_memory().unwrap();
+            let cache = Cache::new(backend);
+
+            let stats = cache.stats().await.unwrap();
+            assert_eq!(stats.size, 0);
+
+            cache.insert("x".to_string(), b"y".to_vec()).await.unwrap();
+            let stats = cache.stats().await.unwrap();
+            assert_eq!(stats.size, 1);
+        }
+
+        #[tokio::test]
+        async fn sqlite_overwrite() {
+            let backend = crate::SqliteBackend::in_memory().unwrap();
+            let cache = Cache::new(backend);
+
+            cache.insert("k".to_string(), b"v1".to_vec()).await.unwrap();
+            cache.insert("k".to_string(), b"v2".to_vec()).await.unwrap();
+            let entry = cache.get(&"k".to_string()).await.unwrap().unwrap();
+            assert_eq!(entry.value, b"v2");
+        }
+
+        #[tokio::test]
+        async fn sqlite_insert_with_swr() {
+            let backend = crate::SqliteBackend::in_memory().unwrap();
+            let cache = Cache::new(backend);
+
+            cache
+                .insert_with_swr(
+                    "k".to_string(),
+                    b"v".to_vec(),
+                    Duration::from_secs(60),
+                    Duration::from_secs(30),
+                )
+                .await
+                .unwrap();
+
+            let entry = cache.get(&"k".to_string()).await.unwrap();
+            assert!(entry.is_some());
+            let entry = entry.unwrap();
+            assert!(entry.expires_at.is_some());
+            assert!(entry.max_age_at.is_some());
+            assert!(entry.stale_until.is_some());
+        }
+
+        #[tokio::test]
+        async fn sqlite_persistence() {
+            let dir = std::env::temp_dir().join("cachekit_test_persist");
+            let db_path = dir.join("test.db");
+            let _ = std::fs::remove_file(&db_path);
+            let _ = std::fs::create_dir_all(&dir);
+
+            {
+                let backend = crate::SqliteBackend::new(&db_path).unwrap();
+                let cache = Cache::new(backend);
+                cache.insert("persist".to_string(), b"data".to_vec()).await.unwrap();
+            }
+
+            {
+                let backend = crate::SqliteBackend::new(&db_path).unwrap();
+                let cache = Cache::new(backend);
+                let entry = cache.get(&"persist".to_string()).await.unwrap();
+                assert!(entry.is_some());
+                assert_eq!(entry.unwrap().value, b"data");
+            }
+
+            let _ = std::fs::remove_dir_all(&dir);
+        }
     }
 }
 

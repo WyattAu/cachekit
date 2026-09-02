@@ -31,6 +31,11 @@ features = ["tokio-comp", "connection-manager"]
 version = "6"
 optional = true
 
+[dependencies.rusqlite]
+version = "0.31"
+optional = true
+features = ["bundled"]
+
 [dependencies.tracing]
 version = "0.1"
 optional = true
@@ -50,6 +55,7 @@ default = ["in-memory"]
 in-memory = ["dep:moka"]
 redis = ["dep:redis"]
 dashmap = ["dep:dashmap"]
+sqlite = ["dep:rusqlite"]
 tracing = ["dep:tracing"]
 metrics = ["dep:metrics"]
 
