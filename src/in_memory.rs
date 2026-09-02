@@ -59,10 +59,14 @@ where
         match self.cache.get(key).await {
             Some(entry) => {
                 self.hits.fetch_add(1, Ordering::Relaxed);
+                #[cfg(feature = "metrics")]
+                metrics::counter!("cachekit_hits_total").increment(1);
                 Ok(Some(entry))
             }
             None => {
                 self.misses.fetch_add(1, Ordering::Relaxed);
+                #[cfg(feature = "metrics")]
+                metrics::counter!("cachekit_misses_total").increment(1);
                 Ok(None)
             }
         }
@@ -117,12 +121,16 @@ where
         } else {
             0.0
         };
+        let size = self.cache.entry_count();
+
+        #[cfg(feature = "metrics")]
+        metrics::histogram!("cachekit_size").record(size as f64);
 
         Ok(CacheStats {
             hits,
             misses,
             hit_rate,
-            size: self.cache.entry_count(),
+            size,
         })
     }
 }
