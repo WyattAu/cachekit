@@ -45,6 +45,7 @@ mod stats;
 pub mod in_memory;
 
 #[cfg(feature = "redis")]
+/// Redis cache backend.
 #[path = "redis.rs"]
 pub mod redis_backend;
 
@@ -238,21 +239,39 @@ where
 
     /// Get a value from the cache.
     pub async fn get(&self, key: &K) -> Result<Option<CacheEntry<V>>, CacheError> {
-        self.backend.get(key).await
+        let result = self.backend.get(key).await;
+        #[cfg(feature = "tracing")]
+        match &result {
+            Ok(Some(_)) => tracing::trace!("cache hit"),
+            Ok(None) => tracing::debug!("cache miss"),
+            Err(e) => tracing::debug!(error = %e, "cache get error"),
+        }
+        result
     }
 
     /// Insert a value into the cache.
     pub async fn insert(&self, key: K, value: V) -> Result<(), CacheError> {
+        #[cfg(feature = "tracing")]
+        tracing::trace!("cache insert");
         self.backend.insert(key, value).await
     }
 
     /// Remove a value from the cache.
     pub async fn remove(&self, key: &K) -> Result<Option<V>, CacheError> {
-        self.backend.remove(key).await
+        let result = self.backend.remove(key).await;
+        #[cfg(feature = "tracing")]
+        match &result {
+            Ok(Some(_)) => tracing::info!("cache eviction (remove)"),
+            Ok(None) => tracing::debug!("cache remove: not found"),
+            Err(e) => tracing::debug!(error = %e, "cache remove error"),
+        }
+        result
     }
 
     /// Clear all entries from the cache.
     pub async fn clear(&self) -> Result<(), CacheError> {
+        #[cfg(feature = "tracing")]
+        tracing::info!("cache cleared");
         self.backend.clear().await
     }
 
