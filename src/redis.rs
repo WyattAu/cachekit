@@ -6,6 +6,12 @@ use redis::aio::MultiplexedConnection;
 use crate::{CacheBackend, CacheEntry, CacheError, CacheStats};
 
 /// Redis cache backend using `redis` crate.
+///
+/// `MultiplexedConnection` is `Clone` via an internal `Arc`; each
+/// `self.conn.clone()` in the `CacheBackend` impl is therefore an atomic
+/// refcount bump, not a new TCP connection. The trait requires `&self`, so
+/// we must clone to obtain a `&mut` handle for `query_async`. Alternative
+/// would be `Arc<Mutex<Connection>>` which would serialize all commands.
 pub struct RedisBackend<K, V> {
     conn: MultiplexedConnection,
     prefix: String,
@@ -33,11 +39,11 @@ where
     /// Connect to a Redis URL and create a new backend.
     pub async fn connect(url: &str, prefix: impl Into<String>) -> Result<Self, CacheError> {
         let client =
-            redis::Client::open(url).map_err(|e| CacheError::Backend(e.to_string()))?;
+            redis::Client::open(url).map_err(|e| CacheError::Backend(e.to_string().into()))?;
         let conn = client
             .get_multiplexed_async_connection()
             .await
-            .map_err(|e| CacheError::Backend(e.to_string()))?;
+            .map_err(|e| CacheError::Backend(e.to_string().into()))?;
         Ok(Self::new(conn, prefix))
     }
 
@@ -83,7 +89,7 @@ where
             .arg(&meta_key)
             .query_async(&mut conn)
             .await
-            .map_err(|e| CacheError::Backend(e.to_string()))?;
+            .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
         let value_json = match value_json {
             Some(v) => v,
@@ -94,12 +100,12 @@ where
         };
 
         let value: V = serde_json::from_str(&value_json)
-            .map_err(|e| CacheError::Serialization(e.to_string()))?;
+            .map_err(|e| CacheError::Serialization(e.to_string().into()))?;
 
         let entry = match meta_json {
             Some(mj) => {
                 let meta: RedisEntryMeta = serde_json::from_str(&mj)
-                    .map_err(|e| CacheError::Serialization(e.to_string()))?;
+                    .map_err(|e| CacheError::Serialization(e.to_string().into()))?;
 
                 let created_at = SystemTime::UNIX_EPOCH
                     + Duration::from_secs(meta.created_at_secs)
@@ -172,7 +178,7 @@ where
         let meta_key = self.meta_key_for(&key);
 
         let value_json = serde_json::to_string(&value)
-            .map_err(|e| CacheError::Serialization(e.to_string()))?;
+            .map_err(|e| CacheError::Serialization(e.to_string().into()))?;
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -189,7 +195,7 @@ where
             stale_until_nanos: None,
         };
         let meta_json = serde_json::to_string(&meta)
-            .map_err(|e| CacheError::Serialization(e.to_string()))?;
+            .map_err(|e| CacheError::Serialization(e.to_string().into()))?;
 
         let mut conn = self.conn.clone();
         let _: () = redis::cmd("MSET")
@@ -199,7 +205,7 @@ where
             .arg(&meta_json)
             .query_async(&mut conn)
             .await
-            .map_err(|e| CacheError::Backend(e.to_string()))?;
+            .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
         Ok(())
     }
@@ -215,7 +221,7 @@ where
         let meta_key = self.meta_key_for(&key);
 
         let value_json = serde_json::to_string(&value)
-            .map_err(|e| CacheError::Serialization(e.to_string()))?;
+            .map_err(|e| CacheError::Serialization(e.to_string().into()))?;
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -234,7 +240,7 @@ where
             stale_until_nanos: Some(now.subsec_nanos()),
         };
         let meta_json = serde_json::to_string(&meta)
-            .map_err(|e| CacheError::Serialization(e.to_string()))?;
+            .map_err(|e| CacheError::Serialization(e.to_string().into()))?;
 
         let mut conn = self.conn.clone();
         let _: () = redis::cmd("MSET")
@@ -244,7 +250,7 @@ where
             .arg(&meta_json)
             .query_async(&mut conn)
             .await
-            .map_err(|e| CacheError::Backend(e.to_string()))?;
+            .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
         // Set TTL on both keys so Redis cleans them up automatically
         let ttl_secs = total_ttl.as_secs();
@@ -253,13 +259,13 @@ where
             .arg(ttl_secs)
             .query_async(&mut conn)
             .await
-            .map_err(|e| CacheError::Backend(e.to_string()))?;
+            .map_err(|e| CacheError::Backend(e.to_string().into()))?;
         let _: () = redis::cmd("EXPIRE")
             .arg(&meta_key)
             .arg(ttl_secs)
             .query_async(&mut conn)
             .await
-            .map_err(|e| CacheError::Backend(e.to_string()))?;
+            .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
         Ok(())
     }
@@ -274,7 +280,7 @@ where
             .arg(&redis_key)
             .query_async(&mut conn)
             .await
-            .map_err(|e| CacheError::Backend(e.to_string()))?;
+            .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
         if let Some(json) = value_json {
             redis::cmd("DEL")
@@ -282,10 +288,10 @@ where
                 .arg(&meta_key)
                 .query_async::<_, ()>(&mut conn)
                 .await
-                .map_err(|e| CacheError::Backend(e.to_string()))?;
+                .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
             let value: V = serde_json::from_str(&json)
-                .map_err(|e| CacheError::Serialization(e.to_string()))?;
+                .map_err(|e| CacheError::Serialization(e.to_string().into()))?;
             Ok(Some(value))
         } else {
             Ok(None)
@@ -300,14 +306,14 @@ where
             .arg(&pattern)
             .query_async(&mut conn)
             .await
-            .map_err(|e| CacheError::Backend(e.to_string()))?;
+            .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
         if !keys.is_empty() {
             redis::cmd("DEL")
                 .arg(&keys)
                 .query_async::<_, ()>(&mut conn)
                 .await
-                .map_err(|e| CacheError::Backend(e.to_string()))?;
+                .map_err(|e| CacheError::Backend(e.to_string().into()))?;
         }
 
         Ok(())
@@ -331,7 +337,7 @@ where
             .arg(&pattern)
             .query_async(&mut conn)
             .await
-            .map_err(|e| CacheError::Backend(e.to_string()))?;
+            .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
         Ok(CacheStats {
             hits,

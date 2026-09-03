@@ -72,7 +72,7 @@ impl CacheBackend for SqliteBackend {
 
     async fn get(&self, key: &String) -> Result<Option<CacheEntry<Vec<u8>>>, crate::CacheError> {
         let result = {
-            let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+            let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
             conn.query_row(
                 "SELECT value, created_at_secs, created_at_nanos,
                         expires_at_secs, expires_at_nanos,
@@ -147,19 +147,19 @@ impl CacheBackend for SqliteBackend {
                 self.misses.fetch_add(1, Ordering::Relaxed);
                 Ok(None)
             }
-            Err(e) => Err(crate::CacheError::Backend(e.to_string())),
+            Err(e) => Err(crate::CacheError::Backend(e.to_string().into())),
         }
     }
 
     async fn insert(&self, key: String, value: Vec<u8>) -> Result<(), crate::CacheError> {
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         let (cas, can) = Self::system_time_to_parts(SystemTime::now());
         conn.execute(
             "INSERT OR REPLACE INTO cache (key, value, created_at_secs, created_at_nanos)
              VALUES (?1, ?2, ?3, ?4)",
             params![key, value, cas, can],
         )
-        .map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+        .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         Ok(())
     }
 
@@ -170,7 +170,7 @@ impl CacheBackend for SqliteBackend {
         max_age: Duration,
         stale_while_revalidate: Duration,
     ) -> Result<(), crate::CacheError> {
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         let now = SystemTime::now();
         let (cas, can) = Self::system_time_to_parts(now);
 
@@ -192,12 +192,12 @@ impl CacheBackend for SqliteBackend {
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
             params![key, value, cas, can, eas, ean, mas, man, sus, sun],
         )
-        .map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+        .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         Ok(())
     }
 
     async fn remove(&self, key: &String) -> Result<Option<Vec<u8>>, crate::CacheError> {
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
 
         let value: Option<Vec<u8>> = conn
             .query_row(
@@ -206,20 +206,20 @@ impl CacheBackend for SqliteBackend {
                 |row| row.get(0),
             )
             .optional()
-            .map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+            .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
 
         if value.is_some() {
             conn.execute("DELETE FROM cache WHERE key = ?1", params![key])
-                .map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+                .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         }
 
         Ok(value)
     }
 
     async fn clear(&self) -> Result<(), crate::CacheError> {
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         conn.execute("DELETE FROM cache", [])
-            .map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+            .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         Ok(())
     }
 
@@ -233,7 +233,7 @@ impl CacheBackend for SqliteBackend {
             0.0
         };
 
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string()))?;
+        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
 
         let now = SystemTime::now();
         let (secs, _nanos) = Self::system_time_to_parts(now);

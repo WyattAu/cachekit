@@ -154,10 +154,10 @@ mod tests {
 
     #[test]
     fn cache_error_display() {
-        let err = CacheError::Serialization("bad json".to_string());
+        let err = CacheError::Serialization("bad json".to_string().into());
         assert_eq!(err.to_string(), "serialization error: bad json");
 
-        let err = CacheError::Backend("redis down".to_string());
+        let err = CacheError::Backend("redis down".to_string().into());
         assert_eq!(err.to_string(), "backend error: redis down");
 
         let err = CacheError::Expired;
@@ -166,7 +166,7 @@ mod tests {
         let err = CacheError::Full;
         assert_eq!(err.to_string(), "cache full");
 
-        let err = CacheError::Other("something".to_string());
+        let err = CacheError::Other("something".to_string().into());
         assert_eq!(err.to_string(), "cache error: something");
     }
 
