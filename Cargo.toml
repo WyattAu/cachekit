@@ -32,7 +32,7 @@ version = "6"
 optional = true
 
 [dependencies.rusqlite]
-version = "0.31"
+version = "0.40"
 optional = true
 features = ["bundled"]
 
