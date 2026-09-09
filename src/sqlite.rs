@@ -1,7 +1,7 @@
-use rusqlite::{params, Connection, OptionalExtension};
+use rusqlite::{Connection, OptionalExtension, params};
 use std::path::Path;
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use crate::{CacheBackend, CacheEntry, CacheStats};
@@ -72,7 +72,10 @@ impl CacheBackend for SqliteBackend {
 
     async fn get(&self, key: &String) -> Result<Option<CacheEntry<Vec<u8>>>, crate::CacheError> {
         let result = {
-            let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
+            let conn = self
+                .conn
+                .lock()
+                .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
             conn.query_row(
                 "SELECT value, created_at_secs, created_at_nanos,
                         expires_at_secs, expires_at_nanos,
@@ -106,27 +109,14 @@ impl CacheBackend for SqliteBackend {
         };
 
         match result {
-            Ok((
-                value,
-                cas,
-                can,
-                eas,
-                ean,
-                mas,
-                man,
-                sus,
-                sun,
-            )) => {
+            Ok((value, cas, can, eas, ean, mas, man, sus, sun)) => {
                 let created_at = Self::sys_to_instant(Self::parts_to_system_time(cas, can));
-                let expires_at = eas.map(|s| {
-                    Self::sys_to_instant(Self::parts_to_system_time(s, ean.unwrap_or(0)))
-                });
-                let max_age_at = mas.map(|s| {
-                    Self::sys_to_instant(Self::parts_to_system_time(s, man.unwrap_or(0)))
-                });
-                let stale_until = sus.map(|s| {
-                    Self::sys_to_instant(Self::parts_to_system_time(s, sun.unwrap_or(0)))
-                });
+                let expires_at = eas
+                    .map(|s| Self::sys_to_instant(Self::parts_to_system_time(s, ean.unwrap_or(0))));
+                let max_age_at = mas
+                    .map(|s| Self::sys_to_instant(Self::parts_to_system_time(s, man.unwrap_or(0))));
+                let stale_until = sus
+                    .map(|s| Self::sys_to_instant(Self::parts_to_system_time(s, sun.unwrap_or(0))));
 
                 if let Some(exp) = expires_at {
                     if std::time::Instant::now() >= exp {
@@ -152,7 +142,10 @@ impl CacheBackend for SqliteBackend {
     }
 
     async fn insert(&self, key: String, value: Vec<u8>) -> Result<(), crate::CacheError> {
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         let (cas, can) = Self::system_time_to_parts(SystemTime::now());
         conn.execute(
             "INSERT OR REPLACE INTO cache (key, value, created_at_secs, created_at_nanos)
@@ -170,7 +163,10 @@ impl CacheBackend for SqliteBackend {
         max_age: Duration,
         stale_while_revalidate: Duration,
     ) -> Result<(), crate::CacheError> {
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         let now = SystemTime::now();
         let (cas, can) = Self::system_time_to_parts(now);
 
@@ -197,7 +193,10 @@ impl CacheBackend for SqliteBackend {
     }
 
     async fn remove(&self, key: &String) -> Result<Option<Vec<u8>>, crate::CacheError> {
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
 
         let value: Option<Vec<u8>> = conn
             .query_row(
@@ -217,7 +216,10 @@ impl CacheBackend for SqliteBackend {
     }
 
     async fn clear(&self) -> Result<(), crate::CacheError> {
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         conn.execute("DELETE FROM cache", [])
             .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
         Ok(())
@@ -233,7 +235,10 @@ impl CacheBackend for SqliteBackend {
             0.0
         };
 
-        let conn = self.conn.lock().map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
+        let conn = self
+            .conn
+            .lock()
+            .map_err(|e| crate::CacheError::Backend(e.to_string().into()))?;
 
         let now = SystemTime::now();
         let (secs, _nanos) = Self::system_time_to_parts(now);

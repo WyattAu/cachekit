@@ -1,3 +1,5 @@
+// Tests/benches assert invariants directly; unwraps keep failures loud.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Property-based tests for cache-pal crate.
 
 use proptest::prelude::*;
@@ -43,7 +45,7 @@ proptest! {
             prop_assert_eq!(0.0f64, 0.0);
         } else {
             let rate = hits as f64 / total as f64;
-            prop_assert!(rate >= 0.0 && rate <= 1.0);
+            prop_assert!((0.0..=1.0).contains(&rate));
         }
     }
 

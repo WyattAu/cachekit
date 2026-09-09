@@ -9,11 +9,12 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use cachekit::{Cache, InMemoryBackend};
+//! use cache_pal::{Cache, InMemoryBackend};
 //!
 //! # #[tokio::main]
 //! # async fn main() {
-//! let backend = InMemoryBackend::new(10_000, std::time::Duration::from_secs(300));
+//! let backend: InMemoryBackend<&str, &str> =
+//!     InMemoryBackend::new(10_000, std::time::Duration::from_secs(300));
 //! let cache = Cache::new(backend);
 //!
 //! // Insert a value
@@ -68,6 +69,7 @@ pub use sqlite::SqliteBackend;
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)] // test assertions unwrap by design
     use super::*;
     use std::time::Duration;
 
@@ -183,7 +185,8 @@ mod tests {
 
     #[tokio::test]
     async fn in_memory_cache_miss() {
-        let backend: InMemoryBackend<&str, i32> = InMemoryBackend::new(100, Duration::from_secs(60));
+        let backend: InMemoryBackend<&str, i32> =
+            InMemoryBackend::new(100, Duration::from_secs(60));
         let cache = Cache::new(backend);
 
         let entry = cache.get(&"nonexistent").await.unwrap();
@@ -235,7 +238,10 @@ mod tests {
             let backend = crate::SqliteBackend::in_memory().unwrap();
             let cache = Cache::new(backend);
 
-            cache.insert("key1".to_string(), b"value1".to_vec()).await.unwrap();
+            cache
+                .insert("key1".to_string(), b"value1".to_vec())
+                .await
+                .unwrap();
             let entry = cache.get(&"key1".to_string()).await.unwrap();
             assert!(entry.is_some());
             assert_eq!(entry.unwrap().value, b"value1");
@@ -339,7 +345,10 @@ mod tests {
             {
                 let backend = crate::SqliteBackend::new(&db_path).unwrap();
                 let cache = Cache::new(backend);
-                cache.insert("persist".to_string(), b"data".to_vec()).await.unwrap();
+                cache
+                    .insert("persist".to_string(), b"data".to_vec())
+                    .await
+                    .unwrap();
             }
 
             {

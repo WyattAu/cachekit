@@ -1,10 +1,12 @@
-use criterion::{criterion_group, criterion_main, Criterion};
+// Tests/benches assert invariants directly; unwraps keep failures loud.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
+use criterion::{Criterion, criterion_group, criterion_main};
 use std::time::Duration;
 
 fn bench_cache_stats_default(c: &mut Criterion) {
     c.bench_function("cache_stats_default", |b| {
         b.iter(|| {
-            let stats = cachekit::CacheStats::default();
+            let stats = cache_pal::CacheStats::default();
             std::hint::black_box(stats);
         });
     });
@@ -13,7 +15,7 @@ fn bench_cache_stats_default(c: &mut Criterion) {
 fn bench_cache_stats_hit_rate(c: &mut Criterion) {
     c.bench_function("cache_stats_hit_rate_calculation", |b| {
         b.iter(|| {
-            let stats = cachekit::CacheStats {
+            let stats = cache_pal::CacheStats {
                 hits: 75,
                 misses: 25,
                 hit_rate: 0.75,
@@ -31,8 +33,8 @@ async fn run_in_memory_benches(c: &mut Criterion) {
 
     group.bench_function("insert", |b| {
         b.iter(|| async {
-            let backend = cachekit::InMemoryBackend::new(10_000, Duration::from_secs(300));
-            let cache = cachekit::Cache::new(backend);
+            let backend = cache_pal::InMemoryBackend::new(10_000, Duration::from_secs(300));
+            let cache = cache_pal::Cache::new(backend);
             for i in 0..100 {
                 cache.insert(format!("key_{}", i), i).await.unwrap();
             }
@@ -41,8 +43,8 @@ async fn run_in_memory_benches(c: &mut Criterion) {
 
     group.bench_function("get_hit", |b| {
         b.iter(|| async {
-            let backend = cachekit::InMemoryBackend::new(10_000, Duration::from_secs(300));
-            let cache = cachekit::Cache::new(backend);
+            let backend = cache_pal::InMemoryBackend::new(10_000, Duration::from_secs(300));
+            let cache = cache_pal::Cache::new(backend);
             for i in 0..100 {
                 cache.insert(format!("key_{}", i), i).await.unwrap();
             }
@@ -54,9 +56,9 @@ async fn run_in_memory_benches(c: &mut Criterion) {
 
     group.bench_function("get_miss", |b| {
         b.iter(|| async {
-            let backend: cachekit::InMemoryBackend<&str, i32> =
-                cachekit::InMemoryBackend::new(10_000, Duration::from_secs(300));
-            let cache = cachekit::Cache::new(backend);
+            let backend: cache_pal::InMemoryBackend<&str, i32> =
+                cache_pal::InMemoryBackend::new(10_000, Duration::from_secs(300));
+            let cache = cache_pal::Cache::new(backend);
             for _i in 0..100 {
                 let _entry = cache.get(&"nonexistent").await.unwrap();
             }
@@ -65,8 +67,8 @@ async fn run_in_memory_benches(c: &mut Criterion) {
 
     group.bench_function("stats_after_ops", |b| {
         b.iter(|| async {
-            let backend = cachekit::InMemoryBackend::new(10_000, Duration::from_secs(300));
-            let cache = cachekit::Cache::new(backend);
+            let backend = cache_pal::InMemoryBackend::new(10_000, Duration::from_secs(300));
+            let cache = cache_pal::Cache::new(backend);
             cache.insert("a", 1).await.unwrap();
             let _ = cache.get(&"a").await.unwrap();
             let _ = cache.get(&"b").await.unwrap();

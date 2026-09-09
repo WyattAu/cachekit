@@ -1,3 +1,5 @@
+// Tests/benches assert invariants directly; unwraps keep failures loud.
+#![allow(clippy::unwrap_used, clippy::expect_used)]
 //! Integration tests for the cachekit (cache-pal) crate.
 //!
 //! Tests CacheStats calculation, CacheEntry creation/expiry,
@@ -5,7 +7,7 @@
 
 use std::time::Duration;
 
-use cache_pal::{Cache, CacheError, CacheEntry, CacheStats, InMemoryBackend};
+use cache_pal::{Cache, CacheEntry, CacheError, CacheStats, InMemoryBackend};
 
 // ---------------------------------------------------------------------------
 // CacheStats calculation
