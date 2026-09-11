@@ -1,5 +1,6 @@
 // Tests/benches assert invariants directly; unwraps keep failures loud.
 #![allow(clippy::unwrap_used, clippy::expect_used)]
+#![cfg(feature = "in-memory")]
 //! Integration tests for the cachekit (cache-pal) crate.
 //!
 //! Tests CacheStats calculation, CacheEntry creation/expiry,

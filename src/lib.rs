@@ -9,10 +9,11 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use cache_pal::{Cache, InMemoryBackend};
-//!
 //! # #[tokio::main]
 //! # async fn main() {
+//! # #[cfg(feature = "in-memory")] {
+//! use cache_pal::{Cache, InMemoryBackend};
+//!
 //! let backend: InMemoryBackend<&str, &str> =
 //!     InMemoryBackend::new(10_000, std::time::Duration::from_secs(300));
 //! let cache = Cache::new(backend);
@@ -24,6 +25,7 @@
 //! if let Some(entry) = cache.get(&"key").await.unwrap() {
 //!     println!("Got value: {}", entry.value);
 //! }
+//! # }
 //! # }
 //! ```
 //!
@@ -67,7 +69,7 @@ pub use redis_backend::RedisBackend;
 #[cfg(feature = "sqlite")]
 pub use sqlite::SqliteBackend;
 
-#[cfg(test)]
+#[cfg(all(test, feature = "in-memory"))]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)] // test assertions unwrap by design
     use super::*;
