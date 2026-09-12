@@ -113,6 +113,11 @@ where
     }
 
     async fn stats(&self) -> Result<crate::CacheStats, crate::CacheError> {
+        // Moka defers eviction/expiry bookkeeping to maintenance tasks; run
+        // them first so size (and the counts they influence) reflect reality
+        // instead of lagging arbitrarily behind recent inserts.
+        self.cache.run_pending_tasks().await;
+
         let hits = self.hits.load(Ordering::Relaxed);
         let misses = self.misses.load(Ordering::Relaxed);
         let total = hits + misses;

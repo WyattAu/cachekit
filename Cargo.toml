@@ -1,6 +1,6 @@
 [package]
 name = "cache-pal"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 rust-version = "1.85"
 description = "Unified caching for Rust — in-memory (moka) and Redis backends with TTL, stale-while-revalidate, and eviction listeners"
@@ -55,7 +55,6 @@ testcontainers = "0.23"
 default = ["in-memory"]
 in-memory = ["dep:moka"]
 redis = ["dep:redis"]
-dashmap = []
 sqlite = ["dep:rusqlite"]
 tracing = ["dep:tracing"]
 metrics = ["dep:metrics"]

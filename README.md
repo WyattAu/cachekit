@@ -7,7 +7,7 @@ Unified caching for Rust — in-memory (moka) and Redis backends with TTL, stale
 
 ## Purpose
 
-`cachekit` provides a unified caching interface with swappable backends. Choose between fast in-memory caching with `moka`, distributed caching with `Redis`, or simple concurrent maps with `dashmap`.
+`cachekit` provides a unified caching interface with swappable backends. Choose between fast in-memory caching with `moka` or distributed caching with `Redis`.
 
 ## Features
 
@@ -23,7 +23,6 @@ Unified caching for Rust — in-memory (moka) and Redis backends with TTL, stale
 |---------|---------|------------|-------------|---------|
 | `moka` | `in-memory` | No | No | Yes |
 | `redis` | `redis` | Yes | Yes | No |
-| `dashmap` | `dashmap` | No | No | No |
 
 ## Usage
 

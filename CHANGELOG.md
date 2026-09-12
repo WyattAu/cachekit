@@ -5,6 +5,25 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 
 ## [Unreleased]
 
+## [0.3.2] - 2026-09-12
+
+### Added
+
+- `tests/config_matrix.rs` (5 tests): behavior-observable coverage for every
+  in-memory knob — `capacity` (eviction enforced vs unbounded), `ttl`
+  (expiry on read vs long-TTL contrast), `tti` (idle expiry + renewal on
+  access vs no-TTI contrast), `max_age` (fresh→stale boundary) and
+  `stale_while_revalidate` (stale serving window / expiry timeline).
+
+### Fixed
+
+- `InMemoryBackend::stats()` now runs moka's pending maintenance tasks
+  before reading the entry count, so `CacheStats.size` (and hit/miss
+  arithmetic around it) reflects reality instead of lagging arbitrarily
+  behind recent inserts/evictions.
+- Removed the vestigial `dashmap` feature flag: it gated no code and the
+  README claimed a dashmap backend that does not exist.
+
 ## [0.3.1] - 2026-09-12
 
 ### Added
