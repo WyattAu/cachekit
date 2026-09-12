@@ -129,28 +129,22 @@ where
                         + Duration::from_nanos(meta.stale_until_nanos.unwrap_or(0) as u64)
                 });
 
-                // Convert SystemTime -> Instant for the entry
+                // Convert SystemTime -> Instant for the entry. Deadlines
+                // are in the future, so `duration_since` errs for them —
+                // mirror the sqlite backend and map the error's duration
+                // onto `Instant::checked_add` instead of saturating at
+                // `now` (which would erase every not-yet-reached deadline).
                 let now = std::time::Instant::now();
                 let sys_now = SystemTime::now();
+                let to_instant = |t: SystemTime| match sys_now.duration_since(t) {
+                    Ok(elapsed) => now.checked_sub(elapsed).unwrap_or(now),
+                    Err(e) => now.checked_add(e.duration()).unwrap_or(now),
+                };
 
-                let created_at_instant = now
-                    .checked_sub(sys_now.duration_since(created_at).unwrap_or_default())
-                    .unwrap_or(now);
-
-                let expires_at_instant = expires_at.map(|et| {
-                    now.checked_sub(sys_now.duration_since(et).unwrap_or_default())
-                        .unwrap_or(now)
-                });
-
-                let max_age_at_instant = max_age_at.map(|ma| {
-                    now.checked_sub(sys_now.duration_since(ma).unwrap_or_default())
-                        .unwrap_or(now)
-                });
-
-                let stale_until_instant = stale_until.map(|su| {
-                    now.checked_sub(sys_now.duration_since(su).unwrap_or_default())
-                        .unwrap_or(now)
-                });
+                let created_at_instant = to_instant(created_at);
+                let expires_at_instant = expires_at.map(to_instant);
+                let max_age_at_instant = max_age_at.map(to_instant);
+                let stale_until_instant = stale_until.map(to_instant);
 
                 CacheEntry {
                     value,
@@ -223,21 +217,36 @@ where
         let value_json = serde_json::to_string(&value)
             .map_err(|e| CacheError::Serialization(e.to_string().into()))?;
 
+        let total_ttl = max_age + stale_while_revalidate;
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap_or_default();
 
-        let total_ttl = max_age + stale_while_revalidate;
+        // Full sub-second precision: deadlines are computed as real
+        // timestamps (not truncated to whole seconds — sub-second SWR
+        // windows must round-trip, and `subsec_nanos` of *now* is not the
+        // sub-second part of the deadline).
+        let to_parts = |t: std::time::SystemTime| {
+            let d = t.duration_since(UNIX_EPOCH).unwrap_or_default();
+            (d.as_secs(), d.subsec_nanos())
+        };
+        let now_sys = UNIX_EPOCH + now;
+        let expires_at = UNIX_EPOCH + now + total_ttl;
+        let max_age_at = UNIX_EPOCH + now + max_age;
+        let (eas, ean) = to_parts(expires_at);
+        let (mas, man) = to_parts(max_age_at);
+        let (sus, sun) = to_parts(expires_at);
+        let _ = now_sys;
 
         let meta = RedisEntryMeta {
             created_at_secs: now.as_secs(),
             created_at_nanos: now.subsec_nanos(),
-            expires_at_secs: Some(now.as_secs() + total_ttl.as_secs()),
-            expires_at_nanos: Some(now.subsec_nanos()),
-            max_age_secs: Some(now.as_secs() + max_age.as_secs()),
-            max_age_nanos: Some(now.subsec_nanos()),
-            stale_until_secs: Some(now.as_secs() + total_ttl.as_secs()),
-            stale_until_nanos: Some(now.subsec_nanos()),
+            expires_at_secs: Some(eas),
+            expires_at_nanos: Some(ean),
+            max_age_secs: Some(mas),
+            max_age_nanos: Some(man),
+            stale_until_secs: Some(sus),
+            stale_until_nanos: Some(sun),
         };
         let meta_json = serde_json::to_string(&meta)
             .map_err(|e| CacheError::Serialization(e.to_string().into()))?;
@@ -252,17 +261,20 @@ where
             .await
             .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
-        // Set TTL on both keys so Redis cleans them up automatically
-        let ttl_secs = total_ttl.as_secs();
-        let _: () = redis::cmd("EXPIRE")
+        // Set TTL on both keys so Redis cleans them up automatically.
+        // Millisecond precision: `EXPIRE` truncates to whole seconds, so a
+        // sub-second SWR window would round to `EXPIRE 0`, deleting the
+        // entry instantly.
+        let ttl_ms = total_ttl.as_millis().max(1) as i64;
+        let _: () = redis::cmd("PEXPIRE")
             .arg(&redis_key)
-            .arg(ttl_secs)
+            .arg(ttl_ms)
             .query_async(&mut conn)
             .await
             .map_err(|e| CacheError::Backend(e.to_string().into()))?;
-        let _: () = redis::cmd("EXPIRE")
+        let _: () = redis::cmd("PEXPIRE")
             .arg(&meta_key)
-            .arg(ttl_secs)
+            .arg(ttl_ms)
             .query_async(&mut conn)
             .await
             .map_err(|e| CacheError::Backend(e.to_string().into()))?;

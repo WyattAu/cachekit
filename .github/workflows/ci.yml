@@ -14,3 +14,18 @@ jobs:
       loom: false
       wasm: false
       miri: false
+
+  # Backend integration suites: sqlite fully local (tempdir), redis against
+  # a container spun up per run via testcontainers (docker preinstalled on
+  # ubuntu-latest runners).
+  integration:
+    name: Integration (sqlite + redis)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - name: sqlite backend suite
+        run: cargo test --features sqlite --test sqlite_backend
+      - name: redis backend suite (testcontainers)
+        run: cargo test --features redis --test redis_backend

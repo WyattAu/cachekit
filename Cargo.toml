@@ -1,6 +1,6 @@
 [package]
 name = "cache-pal"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2024"
 rust-version = "1.85"
 description = "Unified caching for Rust — in-memory (moka) and Redis backends with TTL, stale-while-revalidate, and eviction listeners"
@@ -44,6 +44,11 @@ optional = true
 proptest = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
 criterion = { version = "0.5", features = ["html_reports"] }
+# sqlite_backend.rs: on-disk persistence across a reopen.
+tempfile = "3"
+# redis_backend.rs: a throwaway Redis server per test run (docker).
+testcontainers-modules = { version = "0.11", features = ["redis"] }
+testcontainers = "0.23"
 
 
 [features]
@@ -58,6 +63,14 @@ metrics = ["dep:metrics"]
 [[bench]]
 name = "cache_bench"
 harness = false
+
+[[test]]
+name = "sqlite_backend"
+required-features = ["sqlite"]
+
+[[test]]
+name = "redis_backend"
+required-features = ["redis"]
 
 [lints.clippy]
 unwrap_used = "warn"
