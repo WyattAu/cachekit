@@ -28,7 +28,7 @@ optional = true
 features = ["tokio-comp", "connection-manager"]
 
 [dependencies.rusqlite]
-version = "0.31"
+version = "0.40"
 optional = true
 features = ["bundled"]
 
