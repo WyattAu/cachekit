@@ -47,7 +47,7 @@ criterion = { version = "0.5", features = ["html_reports"] }
 # sqlite_backend.rs: on-disk persistence across a reopen.
 tempfile = "3"
 # redis_backend.rs: a throwaway Redis server per test run (docker).
-testcontainers-modules = { version = "0.11", features = ["redis"] }
+testcontainers-modules = { version = "0.12", features = ["redis"] }
 testcontainers = "0.23"
 
 
