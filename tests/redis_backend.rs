@@ -2,12 +2,17 @@
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 #![cfg(feature = "redis")]
 
-//! Redis backend integration tests against a real Redis server spun up
-//! per run with testcontainers (docker required).
+//! Redis backend integration tests against a real Redis server provided by
+//! the CI job's `services:` container (or any local Redis).
 //!
 //! ```sh
 //! cargo test --features redis --test redis_backend
 //! ```
+//!
+//! Connection: `CACHEKIT_TEST_REDIS_URL` (defaults to the CI service
+//! container at `redis://127.0.0.1:6379/`). Every test uses a distinct key
+//! prefix, so tests share one server safely — prefix isolation is itself
+//! one of the behaviors under test.
 //!
 //! Proves the wire behavior the in-memory unit tests can't: value/meta key
 //! pairs under the backend's prefix, prefix isolation between backends,
@@ -18,15 +23,24 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cache_pal::{Cache, RedisBackend};
-use testcontainers::runners::AsyncRunner;
-use testcontainers_modules::redis::Redis;
 
-async fn spawn_redis() -> (testcontainers::ContainerAsync<Redis>, String) {
-    let container = Redis::default().start().await.unwrap();
-    let host = container.get_host().await.unwrap();
-    let port = container.get_host_port_ipv4(6379).await.unwrap();
-    let url = format!("redis://{host}:{port}/");
-    (container, url)
+/// URL of the Redis server under test.
+fn redis_url() -> String {
+    std::env::var("CACHEKIT_TEST_REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/".into())
+}
+
+/// Connect a `String -> String` backend under `prefix` and clear any state
+/// left by a previous run: the suite shares one server across runs (CI
+/// service container / local redis), so every test must start from zero.
+async fn fresh_string_cache(prefix: &str) -> (String, Cache<String, String>) {
+    let url = redis_url();
+    let cache = Cache::new(
+        RedisBackend::<String, String>::connect(&url, prefix)
+            .await
+            .unwrap(),
+    );
+    cache.clear().await.unwrap();
+    (url, cache)
 }
 
 // ---------------------------------------------------------------------------
@@ -35,12 +49,7 @@ async fn spawn_redis() -> (testcontainers::ContainerAsync<Redis>, String) {
 
 #[tokio::test]
 async fn insert_get_roundtrip_over_the_wire() {
-    let (_c, url) = spawn_redis().await;
-    let cache = Cache::new(
-        RedisBackend::<String, String>::connect(&url, "cachekit-rt")
-            .await
-            .unwrap(),
-    );
+    let (_url, cache) = fresh_string_cache("cachekit-rt").await;
 
     cache.insert("k1".into(), "v1".into()).await.unwrap();
     let entry = cache.get(&"k1".to_string()).await.unwrap().expect("hit");
@@ -53,12 +62,7 @@ async fn insert_get_roundtrip_over_the_wire() {
 
 #[tokio::test]
 async fn miss_returns_none() {
-    let (_c, url) = spawn_redis().await;
-    let cache = Cache::new(
-        RedisBackend::<String, String>::connect(&url, "cachekit-miss")
-            .await
-            .unwrap(),
-    );
+    let (_url, cache) = fresh_string_cache("cachekit-miss").await;
     assert!(cache.get(&"absent".to_string()).await.unwrap().is_none());
     let stats = cache.stats().await.unwrap();
     assert_eq!(stats.misses, 1);
@@ -67,12 +71,13 @@ async fn miss_returns_none() {
 
 #[tokio::test]
 async fn remove_deletes_value_and_meta_keys() {
-    let (_c, url) = spawn_redis().await;
+    let url = redis_url();
     let cache = Cache::new(
         RedisBackend::<String, Vec<u8>>::connect(&url, "cachekit-rm")
             .await
             .unwrap(),
     );
+    cache.clear().await.unwrap();
 
     cache.insert("k".into(), b"payload".to_vec()).await.unwrap();
     let removed = cache.remove(&"k".to_string()).await.unwrap();
@@ -85,7 +90,7 @@ async fn remove_deletes_value_and_meta_keys() {
 
 #[tokio::test]
 async fn clear_removes_every_entry_under_the_prefix() {
-    let (_c, url) = spawn_redis().await;
+    let url = redis_url();
     let cache = Cache::new(
         RedisBackend::<String, u32>::connect(&url, "cachekit-clear")
             .await
@@ -104,12 +109,13 @@ async fn clear_removes_every_entry_under_the_prefix() {
 
 #[tokio::test]
 async fn stats_size_counts_value_and_meta_keys() {
-    let (_c, url) = spawn_redis().await;
+    let url = redis_url();
     let cache = Cache::new(
         RedisBackend::<String, u32>::connect(&url, "cachekit-size")
             .await
             .unwrap(),
     );
+    cache.clear().await.unwrap();
 
     cache.insert("one".into(), 1).await.unwrap();
     // The backend stores a value key plus a meta key, and `stats` counts
@@ -125,17 +131,8 @@ async fn stats_size_counts_value_and_meta_keys() {
 
 #[tokio::test]
 async fn distinct_prefixes_do_not_see_each_others_entries() {
-    let (_c, url) = spawn_redis().await;
-    let a = Cache::new(
-        RedisBackend::<String, String>::connect(&url, "svc-a")
-            .await
-            .unwrap(),
-    );
-    let b = Cache::new(
-        RedisBackend::<String, String>::connect(&url, "svc-b")
-            .await
-            .unwrap(),
-    );
+    let (_url, a) = fresh_string_cache("svc-a").await;
+    let (_url, b) = fresh_string_cache("svc-b").await;
 
     a.insert("shared-key".into(), "from-a".into())
         .await
@@ -181,12 +178,7 @@ async fn distinct_prefixes_do_not_see_each_others_entries() {
 
 #[tokio::test]
 async fn swr_entry_expires_after_max_age_plus_stale_window() {
-    let (_c, url) = spawn_redis().await;
-    let cache = Cache::new(
-        RedisBackend::<String, String>::connect(&url, "cachekit-ttl")
-            .await
-            .unwrap(),
-    );
+    let (_url, cache) = fresh_string_cache("cachekit-ttl").await;
 
     cache
         .insert_with_swr(
@@ -226,12 +218,8 @@ async fn swr_entry_expires_after_max_age_plus_stale_window() {
 
 #[tokio::test]
 async fn concurrent_writers_never_yield_torn_reads() {
-    let (_c, url) = spawn_redis().await;
-    let cache = Arc::new(Cache::new(
-        RedisBackend::<String, String>::connect(&url, "cachekit-race")
-            .await
-            .unwrap(),
-    ));
+    let (_url, cache) = fresh_string_cache("cachekit-race").await;
+    let cache = Arc::new(cache);
 
     let mut handles = Vec::new();
     for w in 0..16u32 {

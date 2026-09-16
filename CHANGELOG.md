@@ -5,6 +5,23 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-09-16
+
+### Breaking (0.x minor re-cut)
+
+- Removed the `dashmap` feature flag (removed in 0.3.2 without a version
+  bump — it gated no code and the README claimed a dashmap backend that
+  does not exist). cargo-semver-checks correctly flags the feature removal
+  against the v0.3.0 baseline, so the minor is re-cut here to start a new
+  clean baseline. No other API changes: 0.3.1 → 0.4.0 is API-identical.
+
+### Changed
+
+- The redis backend suite now runs against the CI job's redis service
+  container (or any local Redis via `CACHEKIT_TEST_REDIS_URL`) instead of
+  spinning up a per-run testcontainers container; testcontainers and
+  testcontainers-modules leave the dev-dependency graph entirely.
+
 ## [0.3.2] - 2026-09-12
 
 ### Added

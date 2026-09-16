@@ -16,16 +16,26 @@ jobs:
       miri: false
 
   # Backend integration suites: sqlite fully local (tempdir), redis against
-  # a container spun up per run via testcontainers (docker preinstalled on
-  # ubuntu-latest runners).
+  # the job's service container (fresh per run). Tests use distinct key
+  # prefixes so they share one server safely.
   integration:
     name: Integration (sqlite + redis)
     runs-on: ubuntu-latest
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
       - name: sqlite backend suite
         run: cargo test --features sqlite --test sqlite_backend
-      - name: redis backend suite (testcontainers)
+      - name: redis backend suite (service container)
         run: cargo test --features redis --test redis_backend
