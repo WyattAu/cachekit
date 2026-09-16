@@ -6,13 +6,15 @@
 //! the CI job's `services:` container (or any local Redis).
 //!
 //! ```sh
-//! cargo test --features redis --test redis_backend
+//! CACHEKIT_TEST_REDIS_URL=redis://127.0.0.1:6379/ \
+//!   cargo test --features redis --test redis_backend
 //! ```
 //!
-//! Connection: `CACHEKIT_TEST_REDIS_URL` (defaults to the CI service
-//! container at `redis://127.0.0.1:6379/`). Every test uses a distinct key
-//! prefix, so tests share one server safely — prefix isolation is itself
-//! one of the behaviors under test.
+//! Connection: `CACHEKIT_TEST_REDIS_URL`. When it is unset the suite skips
+//! with a notice (the shared `quality / test` job has no services); the
+//! dedicated `integration` job sets it and runs every test. Every test
+//! uses a distinct key prefix, so tests share one server safely — prefix
+//! isolation is itself one of the behaviors under test.
 //!
 //! Proves the wire behavior the in-memory unit tests can't: value/meta key
 //! pairs under the backend's prefix, prefix isolation between backends,
@@ -24,23 +26,40 @@ use std::time::Duration;
 
 use cache_pal::{Cache, RedisBackend};
 
-/// URL of the Redis server under test.
-fn redis_url() -> String {
-    std::env::var("CACHEKIT_TEST_REDIS_URL").unwrap_or_else(|_| "redis://127.0.0.1:6379/".into())
+/// URL of the Redis server under test, or `None` when no server is
+/// configured. The shared `quality / test` and `coverage` jobs run
+/// `--all-features` without services, so the suite skips with a notice
+/// there; the dedicated `integration` job sets `CACHEKIT_TEST_REDIS_URL`
+/// and runs every test for real.
+fn redis_url() -> Option<String> {
+    std::env::var("CACHEKIT_TEST_REDIS_URL").ok()
+}
+
+/// Standard skip for jobs without a Redis service: `None` short-circuits
+/// the test with a notice instead of failing.
+macro_rules! redis_or_skip {
+    () => {
+        match redis_url() {
+            Some(url) => url,
+            None => {
+                eprintln!("skipping: CACHEKIT_TEST_REDIS_URL not set (no redis service)");
+                return;
+            }
+        }
+    };
 }
 
 /// Connect a `String -> String` backend under `prefix` and clear any state
 /// left by a previous run: the suite shares one server across runs (CI
 /// service container / local redis), so every test must start from zero.
-async fn fresh_string_cache(prefix: &str) -> (String, Cache<String, String>) {
-    let url = redis_url();
+async fn fresh_string_cache(url: &str, prefix: &str) -> (String, Cache<String, String>) {
     let cache = Cache::new(
-        RedisBackend::<String, String>::connect(&url, prefix)
+        RedisBackend::<String, String>::connect(url, prefix)
             .await
             .unwrap(),
     );
     cache.clear().await.unwrap();
-    (url, cache)
+    (url.to_string(), cache)
 }
 
 // ---------------------------------------------------------------------------
@@ -49,7 +68,8 @@ async fn fresh_string_cache(prefix: &str) -> (String, Cache<String, String>) {
 
 #[tokio::test]
 async fn insert_get_roundtrip_over_the_wire() {
-    let (_url, cache) = fresh_string_cache("cachekit-rt").await;
+    let url = redis_or_skip!();
+    let (_url, cache) = fresh_string_cache(&url, "cachekit-rt").await;
 
     cache.insert("k1".into(), "v1".into()).await.unwrap();
     let entry = cache.get(&"k1".to_string()).await.unwrap().expect("hit");
@@ -62,7 +82,8 @@ async fn insert_get_roundtrip_over_the_wire() {
 
 #[tokio::test]
 async fn miss_returns_none() {
-    let (_url, cache) = fresh_string_cache("cachekit-miss").await;
+    let url = redis_or_skip!();
+    let (_url, cache) = fresh_string_cache(&url, "cachekit-miss").await;
     assert!(cache.get(&"absent".to_string()).await.unwrap().is_none());
     let stats = cache.stats().await.unwrap();
     assert_eq!(stats.misses, 1);
@@ -71,7 +92,7 @@ async fn miss_returns_none() {
 
 #[tokio::test]
 async fn remove_deletes_value_and_meta_keys() {
-    let url = redis_url();
+    let url = redis_or_skip!();
     let cache = Cache::new(
         RedisBackend::<String, Vec<u8>>::connect(&url, "cachekit-rm")
             .await
@@ -90,7 +111,7 @@ async fn remove_deletes_value_and_meta_keys() {
 
 #[tokio::test]
 async fn clear_removes_every_entry_under_the_prefix() {
-    let url = redis_url();
+    let url = redis_or_skip!();
     let cache = Cache::new(
         RedisBackend::<String, u32>::connect(&url, "cachekit-clear")
             .await
@@ -109,7 +130,7 @@ async fn clear_removes_every_entry_under_the_prefix() {
 
 #[tokio::test]
 async fn stats_size_counts_value_and_meta_keys() {
-    let url = redis_url();
+    let url = redis_or_skip!();
     let cache = Cache::new(
         RedisBackend::<String, u32>::connect(&url, "cachekit-size")
             .await
@@ -131,8 +152,9 @@ async fn stats_size_counts_value_and_meta_keys() {
 
 #[tokio::test]
 async fn distinct_prefixes_do_not_see_each_others_entries() {
-    let (_url, a) = fresh_string_cache("svc-a").await;
-    let (_url, b) = fresh_string_cache("svc-b").await;
+    let url = redis_or_skip!();
+    let (_url, a) = fresh_string_cache(&url, "svc-a").await;
+    let (_url, b) = fresh_string_cache(&url, "svc-b").await;
 
     a.insert("shared-key".into(), "from-a".into())
         .await
@@ -178,7 +200,8 @@ async fn distinct_prefixes_do_not_see_each_others_entries() {
 
 #[tokio::test]
 async fn swr_entry_expires_after_max_age_plus_stale_window() {
-    let (_url, cache) = fresh_string_cache("cachekit-ttl").await;
+    let url = redis_or_skip!();
+    let (_url, cache) = fresh_string_cache(&url, "cachekit-ttl").await;
 
     cache
         .insert_with_swr(
@@ -218,7 +241,8 @@ async fn swr_entry_expires_after_max_age_plus_stale_window() {
 
 #[tokio::test]
 async fn concurrent_writers_never_yield_torn_reads() {
-    let (_url, cache) = fresh_string_cache("cachekit-race").await;
+    let url = redis_or_skip!();
+    let (_url, cache) = fresh_string_cache(&url, "cachekit-race").await;
     let cache = Arc::new(cache);
 
     let mut handles = Vec::new();

@@ -38,4 +38,6 @@ jobs:
       - name: sqlite backend suite
         run: cargo test --features sqlite --test sqlite_backend
       - name: redis backend suite (service container)
+        env:
+          CACHEKIT_TEST_REDIS_URL: redis://127.0.0.1:6379/
         run: cargo test --features redis --test redis_backend
