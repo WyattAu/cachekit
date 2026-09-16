@@ -43,7 +43,7 @@ optional = true
 [dev-dependencies]
 proptest = "1"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.7", features = ["html_reports"] }
 # sqlite_backend.rs: on-disk persistence across a reopen.
 tempfile = "3"
 # redis_backend.rs: talks to the CI job's redis service container (or any
