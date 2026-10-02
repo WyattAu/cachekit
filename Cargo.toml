@@ -23,7 +23,7 @@ optional = true
 features = ["future"]
 
 [dependencies.redis]
-version = "0.25"
+version = "1.2"
 optional = true
 features = ["tokio-comp", "connection-manager"]
 
