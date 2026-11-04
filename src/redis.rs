@@ -298,7 +298,7 @@ where
             redis::cmd("DEL")
                 .arg(&redis_key)
                 .arg(&meta_key)
-                .query_async::<_, ()>(&mut conn)
+                .query_async::<()>(&mut conn)
                 .await
                 .map_err(|e| CacheError::Backend(e.to_string().into()))?;
 
@@ -323,7 +323,7 @@ where
         if !keys.is_empty() {
             redis::cmd("DEL")
                 .arg(&keys)
-                .query_async::<_, ()>(&mut conn)
+                .query_async::<()>(&mut conn)
                 .await
                 .map_err(|e| CacheError::Backend(e.to_string().into()))?;
         }

@@ -1,6 +1,6 @@
 [package]
 name = "cache-pal"
-version = "0.4.1"
+version = "0.5.0"
 edition = "2024"
 rust-version = "1.85"
 description = "Unified caching for Rust: in-memory (moka) and Redis backends with TTL, stale-while-revalidate, and eviction listeners"
@@ -23,7 +23,7 @@ optional = true
 features = ["future"]
 
 [dependencies.redis]
-version = "0.25"
+version = "0.27"
 optional = true
 features = ["tokio-comp", "connection-manager"]
 
