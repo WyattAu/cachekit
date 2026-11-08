@@ -1,0 +1,13 @@
+# cachekit
+
+> Unified caching for Rust: in-memory (moka) and Redis backends with TTL,
+> stale-while-revalidate, and eviction listeners behind one caching interface
+> with swappable backends.
+
+## Docs
+
+- [README.md](README.md): cache semantics, backend selection, quick start.
+- [REQUIREMENTS.md](REQUIREMENTS.md): numbered requirements REQ-CP-001..901 with test traceability.
+- [THREAT-MODEL.md](THREAT-MODEL.md): threat model and security mitigations.
+- [SECURITY.md](SECURITY.md): security policy.
+- [CHANGELOG.md](CHANGELOG.md): release history.

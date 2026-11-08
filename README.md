@@ -54,3 +54,13 @@ async fn main() {
 ## License
 
 Licensed under either of [Apache License, Version 2.0](./LICENSE-APACHE) or [MIT license](./LICENSE-MIT) at your option.
+
+## Where the truth lives
+
+| Concern | File |
+|---|---|
+| Cache semantics, backends, usage (normative) | `README.md` |
+| Requirements REQ-CP-001..901 + traceability | `REQUIREMENTS.md` |
+| Threat model | `THREAT-MODEL.md` |
+| Security policy | `SECURITY.md` |
+| Release history | `CHANGELOG.md` |
