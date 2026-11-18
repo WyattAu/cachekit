@@ -1,11 +1,11 @@
-# Threat Model — cachekit
+# Threat Model; cachekit
 
 Reference: STRIDE. Scope: the crate's public API surface. Trust boundary:
 (1) bytes/inputs entering public constructors and parsers, (2) concurrent
-callers sharing interior state. cachekit is an in-process library — it opens
+callers sharing interior state. cachekit is an in-process library; it opens
 no sockets and inherits the embedding process's trust domain.
 
-Purpose: Cache abstraction (`cache-pal`) — TTL cache with in-memory/Redis/SQLite backends and stats
+Purpose: Cache abstraction (`cache-pal`); TTL cache with in-memory/Redis/SQLite backends and stats
 
 ## Assets
 

@@ -1,6 +1,6 @@
 # cachekit
 
-Unified caching for Rust — in-memory (moka) and Redis backends with TTL, stale-while-revalidate, and eviction listeners.
+Unified caching for Rust; in-memory (moka) and Redis backends with TTL, stale-while-revalidate, and eviction listeners.
 
 [![Crates.io](https://img.shields.io/crates/v/cachekit.svg)](https://crates.io/crates/cachekit)
 [![License](https://img.shields.io/badge/license-MIT%2FApache--2.0-blue.svg)](./LICENSE-MIT)
@@ -11,11 +11,11 @@ Unified caching for Rust — in-memory (moka) and Redis backends with TTL, stale
 
 ## Features
 
-- **Unified API** — same `Cache<K,V>` interface regardless of backend
-- **TTL support** — configurable time-to-live for entries
-- **Stale-while-revalidate** — serve stale data while refreshing
-- **Eviction listeners** — react to cache evictions
-- **No unsafe code** — `#![forbid(unsafe_code)]`
+- **Unified API**; same `Cache<K,V>` interface regardless of backend
+- **TTL support**; configurable time-to-live for entries
+- **Stale-while-revalidate**; serve stale data while refreshing
+- **Eviction listeners**; react to cache evictions
+- **No unsafe code**; `#![forbid(unsafe_code)]`
 
 ## Backend Comparison
 

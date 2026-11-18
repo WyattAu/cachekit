@@ -1,7 +1,7 @@
 # Changelog
 
 All notable changes to this project are documented here. Format: [Keep a
-Changelog](https://keepachangelog.com/) — versions follow [semver](https://semver.org).
+Changelog](https://keepachangelog.com/); versions follow [semver](https://semver.org).
 
 ## [Unreleased]
 
@@ -10,7 +10,7 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 ### Breaking (0.x minor re-cut)
 
 - Removed the `dashmap` feature flag (removed in 0.3.2 without a version
-  bump — it gated no code and the README claimed a dashmap backend that
+  bump; it gated no code and the README claimed a dashmap backend that
   does not exist). cargo-semver-checks correctly flags the feature removal
   against the v0.3.0 baseline, so the minor is re-cut here to start a new
   clean baseline. No other API changes: 0.3.1 → 0.4.0 is API-identical.
@@ -27,7 +27,7 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 ### Added
 
 - `tests/config_matrix.rs` (5 tests): behavior-observable coverage for every
-  in-memory knob — `capacity` (eviction enforced vs unbounded), `ttl`
+  in-memory knob; `capacity` (eviction enforced vs unbounded), `ttl`
   (expiry on read vs long-TTL contrast), `tti` (idle expiry + renewal on
   access vs no-TTI contrast), `max_age` (fresh→stale boundary) and
   `stale_while_revalidate` (stale serving window / expiry timeline).
@@ -78,4 +78,5 @@ Changelog](https://keepachangelog.com/) — versions follow [semver](https://sem
 ## [0.3.0] - 2026-09-05
 
 ### Added
+
 - Initial public release.

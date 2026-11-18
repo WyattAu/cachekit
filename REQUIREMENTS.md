@@ -1,9 +1,9 @@
-# Requirements — cachekit
+# Requirements; cachekit
 
 Numbered, testable requirements. Every requirement maps to at least one named
 test or doc-comment contract; security-relevant items cite threat-model rows.
 
-Scope: Cache abstraction (`cache-pal`) — TTL cache with in-memory/Redis/SQLite backends and stats
+Scope: Cache abstraction (`cache-pal`); TTL cache with in-memory/Redis/SQLite backends and stats
 
 ## Functional
 
