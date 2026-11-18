@@ -4,8 +4,8 @@
 
 | Version | Supported |
 |---|---|
-| latest   | ✅ |
-| < latest | ❌ (upgrade) |
+| latest   | yes |
+| < latest | no (upgrade) |
 
 ## Reporting a Vulnerability
 
@@ -22,7 +22,7 @@ credited in the advisory unless anonymity is requested.
 
 ## Scope
 
-In scope: anything that breaks the crate's documented security contract —
+In scope: anything that breaks the crate's documented security contract;
 panic on adversarial input in code paths documented as panic-free, signature/
 MAC bypass, timing side channels in secret-dependent operations, injection
 via parsed input, dependency-introduced vulnerabilities.
