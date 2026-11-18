@@ -1,4 +1,7 @@
 
 # cargo-vet audits file
 
-[audits]
+[[audits.cache-pal]]
+criteria = "safe-to-deploy"
+version = "0.5.0"
+notes = "first-party crate (this repo): staleness-budget cache with pluggable backends"

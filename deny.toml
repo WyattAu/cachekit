@@ -7,6 +7,15 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+ignore = [
+    # RUSTSEC-2026-0459 + RUSTSEC-2026-0386: SQLite CVE-2026-119375 via
+    # bundled libsqlite3-sys 0.28 (pinned by rusqlite 0.31; no compatible
+    # upgrade in-range as of 2026-11-18). Exposure is the local/embedded
+    # sqlite cache backend, not a network-facing service. Re-evaluate on
+    # the rusqlite 0.32+ upgrade.
+    "RUSTSEC-2026-0459",
+    "RUSTSEC-2026-0386",
+]
 
 [licenses]
 version = 2
